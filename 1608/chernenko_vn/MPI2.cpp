@@ -79,9 +79,9 @@ int main(int argc, char **argv)
 
 		//Create columnsType
 		int* sizes = new int[x] {x, y};
-		int* sizes2 = new int[x] {x, k};
+		int* newSizes = new int[x] {x, k};
 		int* starts = new int[x] {0, 0};
-		MPI_Type_create_subarray(2, sizes, sizes2, starts, MPI_ORDER_C, MPI_INT, &columnsType);
+		MPI_Type_create_subarray(2, sizes, newSizes, starts, MPI_ORDER_C, MPI_INT, &columnsType);
 		MPI_Type_commit(&columnsType);
 
 		MPI_Bcast(&x, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -160,6 +160,9 @@ int main(int argc, char **argv)
 		delete tmpResultVector;
 		delete resultVector;
 		delete checkResult;
+		delete sizes;
+		delete newSizes;
+		delete starts;
 
 	} else {
 
@@ -168,9 +171,9 @@ int main(int argc, char **argv)
 		MPI_Bcast(&k, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 		int* sizes = new int[x] {x, y};
-		int* sizes2 = new int[x] {x, k};
+		int* newSizes = new int[x] {x, k};
 		int* starts = new int[x] {0, 0};
-		MPI_Type_create_subarray(2, sizes, sizes2, starts, MPI_ORDER_FORTRAN, MPI_INT, &columnsType);
+		MPI_Type_create_subarray(2, sizes, newSizes, starts, MPI_ORDER_FORTRAN, MPI_INT, &columnsType);
 		MPI_Type_commit(&columnsType);
 
 		if (k > 1) {
@@ -186,8 +189,10 @@ int main(int argc, char **argv)
 			delete matrix;
 			delete vector;
 			delete resultVector;
-
 		}
+		delete sizes;
+		delete newSizes;
+		delete starts;
 	}
 	MPI_Type_free(&columnsType);
 	MPI_Finalize();
