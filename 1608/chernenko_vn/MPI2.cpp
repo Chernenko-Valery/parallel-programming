@@ -70,12 +70,15 @@ int main(int argc, char **argv)
 	int x, y, k;
 	MPI_Status status;
 	MPI_Datatype columnsType;
+	MPI_Datatype lastColumnsType;
 
 	if (ProcRank == 0) {
 		x = atoi(argv[1]);
 		y = atoi(argv[2]);
 		if (ProcSize == 1) k = 1;
 		else k = y / (ProcSize - 1);
+		int lastY = (ProcSize - 1)*k;
+		int lastCount = y - lastY;
 
 		//Create columnsType
 		int* sizes = new int[x] {x, y};
@@ -83,6 +86,13 @@ int main(int argc, char **argv)
 		int* starts = new int[x] {0, 0};
 		MPI_Type_create_subarray(2, sizes, newSizes, starts, MPI_ORDER_C, MPI_INT, &columnsType);
 		MPI_Type_commit(&columnsType);
+
+		//Create lastColumnsType
+		int* lastSizes = new int[x] {x, y};
+		int* lastNewSizes = new int[x] {x, k + lastCount};
+		int* lastStarts = new int[x] {0, 0};
+		MPI_Type_create_subarray(2, lastSizes, lastNewSizes, lastStarts, MPI_ORDER_C, MPI_INT, &lastColumnsType);
+		MPI_Type_commit(&lastColumnsType);
 
 		MPI_Bcast(&x, 1, MPI_INT, 0, MPI_COMM_WORLD);
 		MPI_Bcast(&y, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -119,23 +129,18 @@ int main(int argc, char **argv)
 			vectorsendcounts[i] = k;
 			vectordispls[i] = (i - 1)*k;
 		}
-		int lastY = (ProcSize - 1)*k;
-		int lastCount = y - lastY;
-		vectorsendcounts[0] = lastCount;
-		vectordispls[0] = lastY;
-		int* lastVector = new int[lastCount];
-		MPI_Scatterv(vector, vectorsendcounts, vectordispls, MPI_INT, lastVector, lastCount, MPI_INT, 0, MPI_COMM_WORLD);
+		vectorsendcounts[ProcSize - 1] = k + lastCount;
+		vectorsendcounts[0] = 0;
+		vectordispls[0] = 0;
+		int* lastVector;;
+		MPI_Scatterv(vector, vectorsendcounts, vectordispls, MPI_INT, lastVector, 0, MPI_INT, 0, MPI_COMM_WORLD);
+		delete vectorsendcounts;
+		delete vectordispls;
 
-		long* tmpResultVector;
-		if (lastCount != 0) {
-			tmpResultVector = MultPartMatrOnVect(matrix, x, y, lastVector, lastCount, lastY, lastCount);
-		}
-		else tmpResultVector = new long[x] {0};
-
-		for (int i = 1; i < ProcSize; i++) {
+		for (int i = 1; i < ProcSize - 1; i++)
 			MPI_Send(matrix + (i - 1)*k, 1, columnsType, i, 0, MPI_COMM_WORLD);
-		}
-
+		MPI_Send(matrix + (ProcSize - 2)*k, 1, lastColumnsType, ProcSize - 1, 0, MPI_COMM_WORLD);
+		long* tmpResultVector = new long[x] {0};
 
 		MPI_Reduce(tmpResultVector, resultVector, x, MPI_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
 
@@ -163,12 +168,50 @@ int main(int argc, char **argv)
 		delete sizes;
 		delete newSizes;
 		delete starts;
+		delete lastSizes;
+		delete lastNewSizes;
+		delete lastStarts;
+		MPI_Type_free(&lastColumnsType);
+
+	}
+	else if (ProcRank == ProcSize - 1) {
+
+		MPI_Bcast(&x, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&y, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&k, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		int lastY = (ProcSize - 1)*k;
+		int lastCount = y - lastY;
+
+		int* sizes = new int[x] {x, y};
+		int* newSizes = new int[x] {x, k + lastCount};
+		int* starts = new int[x] {0, 0};
+		MPI_Type_create_subarray(2, sizes, newSizes, starts, MPI_ORDER_FORTRAN, MPI_INT, &columnsType);
+		MPI_Type_commit(&columnsType);
+
+		if (k > 1) {
+			int* matrix = new int[x*(k+lastCount)]{ 0 };
+			int* vector = new int[k];
+			MPI_Scatterv(nullptr, nullptr, nullptr, MPI_INT, vector, k + lastCount, MPI_INT, 0, MPI_COMM_WORLD);
+			MPI_Recv(matrix, 1, columnsType, 0, 0, MPI_COMM_WORLD, &status);
+			double timeStart = MPI_Wtime();
+			long* resultVector = MultMatrOnVect(matrix, x, k + lastCount, vector, k + lastCount);
+			double timeEnd = MPI_Wtime();
+			MPI_Reduce(resultVector, nullptr, x, MPI_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+			cout << "Time on Proc " << ProcRank << " = " << timeEnd - timeStart << endl;
+			delete matrix;
+			delete vector;
+			delete resultVector;
+		}
+		delete sizes;
+		delete newSizes;
+		delete starts;
 
 	} else {
 
 		MPI_Bcast(&x, 1, MPI_INT, 0, MPI_COMM_WORLD);
 		MPI_Bcast(&y, 1, MPI_INT, 0, MPI_COMM_WORLD);
 		MPI_Bcast(&k, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
 
 		int* sizes = new int[x] {x, y};
 		int* newSizes = new int[x] {x, k};
