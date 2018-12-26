@@ -161,8 +161,8 @@ int main(int argc, char** argv) {
 		int* WorkImage2 = new int[sendCounts[0]];
 		int* WorkImage3 = new int[sendCounts[0]];
 		MPI_Scatterv(imageData1, sendCounts, displs, MPI_INT, WorkImage1, sendCounts[0], MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Scatterv(imageData1, sendCounts, displs, MPI_INT, WorkImage2, sendCounts[0], MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Scatterv(imageData1, sendCounts, displs, MPI_INT, WorkImage3, sendCounts[0], MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Scatterv(imageData2, sendCounts, displs, MPI_INT, WorkImage2, sendCounts[0], MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Scatterv(imageData3, sendCounts, displs, MPI_INT, WorkImage3, sendCounts[0], MPI_INT, 0, MPI_COMM_WORLD);
 		
 		int* ResultWorkImage1 = getPartlySobelImage(WorkImage1, width, sendCounts[0] / width, 0, 0, width, sendCounts[0] / width - 1, sobelMatrix1, sobelMatrix2);
 		int* ResultWorkImage2 = getPartlySobelImage(WorkImage2, width, sendCounts[0] / width, 0, 0, width, sendCounts[0] / width - 1, sobelMatrix1, sobelMatrix2);
